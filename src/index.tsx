@@ -7,7 +7,9 @@ import { App } from "./app/App.js";
 const bundlerConfig = {
   "src/app/Clock.tsx": {
     Clock: {
-      pika: "chu",
+      id: "Clock.tsx",
+      name: "Clock",
+      chunks: ["pika", "chu"],
     },
   },
 };
