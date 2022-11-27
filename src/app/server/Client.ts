@@ -24,6 +24,7 @@ export const bundlerConfig = {
           id: "__mod__",
           name: key,
           chunks: [],
+          async: true,
         };
       },
     }
