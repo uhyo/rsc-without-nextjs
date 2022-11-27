@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
+import { ClientComponent } from "../shared/registry.js";
 
-export const Clock: React.FC = () => {
+declare global {
+  interface ClientComponents {
+    Clock: {};
+  }
+}
+
+export const Clock: ClientComponent<"Clock"> = () => {
   const [time, setTime] = useState("");
   useEffect(() => {
     const timerId = setInterval(() => {

@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "start": "node --conditions react-server dist/index.js",
+    "start": "node --conditions react-server dist/server.js",
     "vite": "vite dev",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
