@@ -1,4 +1,5 @@
 import { Readable, PassThrough } from "stream";
+import { writeFile } from "fs/promises";
 import ReactDOM from "react-dom/server";
 // @ts-expect-error
 import rsdws from "react-server-dom-webpack/server";
@@ -28,12 +29,35 @@ const Container = () => {
   return use(chunk);
 };
 
-ReactDOM.renderToPipeableStream(<Container />, {
-  onError(error) {
-    if (error instanceof ClientComponentError) {
-      // 握りつぶす
-      return;
-    }
-    console.error(error);
-  },
-}).pipe(process.stdout);
+renderHTML().then(async (html) => {
+  await writeFile("./index.html", html);
+});
+
+async function renderHTML() {
+  let result = `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+  </head>
+  <body>
+    <div id="app">`;
+
+  const htmlStream = ReactDOM.renderToPipeableStream(<Container />, {
+    onError(error) {
+      if (error instanceof ClientComponentError) {
+        // 握りつぶす
+        return;
+      }
+      console.error(error);
+    },
+  }).pipe(new PassThrough());
+  for await (const chunk of htmlStream) {
+    result += chunk;
+  }
+
+  result += `</div>
+    <script type="module" src="src/client.tsx"></script>
+  </body>
+</html>`;
+  return result;
+}
