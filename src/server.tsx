@@ -42,7 +42,9 @@ async function renderHTML() {
   <body>
     <div id="app">`;
 
-  const htmlStream = ReactDOM.renderToPipeableStream(<Container />, {
+  const htmlStream = new PassThrough();
+
+  const reactHtmlStream = ReactDOM.renderToPipeableStream(<Container />, {
     onError(error) {
       if (error instanceof ClientComponentError) {
         // 握りつぶす
@@ -50,7 +52,10 @@ async function renderHTML() {
       }
       console.error(error);
     },
-  }).pipe(new PassThrough());
+    onAllReady() {
+      reactHtmlStream.pipe(htmlStream);
+    },
+  });
   for await (const chunk of htmlStream) {
     result += chunk;
   }
