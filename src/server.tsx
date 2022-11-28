@@ -16,18 +16,24 @@ const stream = Readable.toWeb(
   renderToPipeableStream(<App />, bundlerConfig).pipe(new PassThrough())
 );
 
+class ClientComponentError extends Error {}
+
 const chunk = createFromReadableStream(stream);
 // @ts-expect-error
-globalThis.__webpack_require__ = () => new Promise(() => {});
+globalThis.__webpack_require__ = async () => {
+  throw new ClientComponentError("Client Component");
+};
 
 const Container = () => {
   return use(chunk);
 };
 
-const controls = ReactDOM.renderToPipeableStream(<Container />, {
-  onShellReady() {
-    // @ts-expect-error
-    controls.abort("");
+ReactDOM.renderToPipeableStream(<Container />, {
+  onError(error) {
+    if (error instanceof ClientComponentError) {
+      // 握りつぶす
+      return;
+    }
+    console.error(error);
   },
-});
-controls.pipe(process.stdout);
+}).pipe(process.stdout);
