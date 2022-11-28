@@ -13,13 +13,13 @@ import { bundlerConfig } from "./app/server/Client.js";
 // @ts-expect-error
 import { use } from "react";
 
-const stream = Readable.toWeb(
+const [stream1, stream2] = Readable.toWeb(
   renderToPipeableStream(<App />, bundlerConfig).pipe(new PassThrough())
-);
+).tee();
 
 class ClientComponentError extends Error {}
 
-const chunk = createFromReadableStream(stream);
+const chunk = createFromReadableStream(stream1);
 // @ts-expect-error
 globalThis.__webpack_require__ = async () => {
   throw new ClientComponentError("Client Component");
@@ -56,8 +56,28 @@ async function renderHTML() {
   }
 
   result += `</div>
+    <script id="ssr-data" type="text/plain" data-data="`;
+
+  const decoder = new TextDecoder("utf-8");
+  for await (const chunk of stream2) {
+    result += escapeHTML(decoder.decode(chunk));
+  }
+
+  result += `"></script>
     <script type="module" src="src/client.tsx"></script>
   </body>
 </html>`;
   return result;
+}
+
+const escapeHTMLTable: Partial<Record<string, string>> = {
+  "<": "&lt;",
+  ">": "&gt;",
+  "&": "&amp;",
+  "'": "&#x27;",
+  '"': "&quot;",
+};
+
+function escapeHTML(str: string) {
+  return str.replace(/[<>&'"]/g, (char) => escapeHTMLTable[char] ?? "");
 }
