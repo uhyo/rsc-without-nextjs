@@ -1,51 +1,70 @@
 import type {} from "react/canary";
+import { spawn } from "child_process";
 import { Readable, PassThrough } from "stream";
-import { writeFile } from "fs/promises";
+import type { ReadableStream } from "stream/web";
+import { fileURLToPath } from "url";
+import { createWriteStream } from "fs";
+
+import ReactDOM from "react-dom/server";
 // @ts-expect-error
-import rsdws from "react-server-dom-webpack/server";
-const { renderToPipeableStream } = rsdws;
+import rsdwc from "react-server-dom-webpack/client";
+const { createFromReadableStream } = rsdwc;
 
-import { App } from "./app/server/App.js";
-import { bundlerConfig } from "./app/server/Client.js";
+import { allClientComponents } from "./app/client/clientComponents.js";
+import { use } from "react";
 
-const stream = Readable.toWeb(
-  renderToPipeableStream(<App />, bundlerConfig).pipe(new PassThrough())
-);
+function render() {
+  const rscFile = fileURLToPath(
+    new URL("./rsc.js", import.meta.url).toString(),
+  );
+  const proc = spawn("node", ["--conditions", "react-server", rscFile], {
+    stdio: ["ignore", "pipe", "inherit"],
+  });
+  return proc.stdout;
+}
 
-renderHTML().then(async (html) => {
-  await writeFile("./index.html", html);
-});
+// @ts-expect-error
+globalThis.__webpack_require__ = async () => {
+  return allClientComponents;
+};
 
-async function renderHTML() {
-  let result = `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-  </head>
-  <body>
-    <div id="app"></div>
-    <script id="ssr-data" type="text/plain" data-data="`;
+async function renderHTML(): Promise<Readable> {
+  const [stream1, stream2] = Readable.toWeb(render()).tee();
 
-  const decoder = new TextDecoder("utf-8");
+  const chunk = createFromReadableStream(stream1);
+  const rscData = await readAll(stream2);
+
+  const PageContainer: React.FC = () => {
+    return (
+      <html lang="en">
+        <head>
+          <meta charSet="utf-8" />
+        </head>
+        <body>
+          <div id="app">{use(chunk)}</div>
+          <script id="rsc-data" data-data={rscData} />
+        </body>
+      </html>
+    );
+  };
+
+  const htmlStream = ReactDOM.renderToPipeableStream(<PageContainer />, {
+    bootstrapModules: ["src/client.tsx"],
+  }).pipe(new PassThrough());
+
+  return htmlStream;
+}
+
+async function readAll(stream: ReadableStream<Uint8Array>): Promise<string> {
+  let result = "";
+  const decoder = new TextDecoder();
   for await (const chunk of stream) {
-    result += escapeHTML(decoder.decode(chunk));
+    result += decoder.decode(chunk);
   }
-
-  result += `"></script>
-    <script type="module" src="src/client.tsx"></script>
-  </body>
-</html>`;
   return result;
 }
 
-const escapeHTMLTable: Partial<Record<string, string>> = {
-  "<": "&lt;",
-  ">": "&gt;",
-  "&": "&amp;",
-  "'": "&#x27;",
-  '"': "&quot;",
-};
-
-function escapeHTML(str: string) {
-  return str.replace(/[<>&'"]/g, (char) => escapeHTMLTable[char] ?? "");
-}
+renderHTML().then(async (html) => {
+  const file = createWriteStream("./index.html");
+  html.pipe(file);
+});
