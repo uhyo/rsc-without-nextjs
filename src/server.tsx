@@ -2,8 +2,9 @@ import type {} from "react/canary";
 import { spawn } from "child_process";
 import http from "http";
 import { Readable, PassThrough } from "stream";
+import { ReadableStream } from "stream/web";
 import { fileURLToPath } from "url";
-import { createWriteStream } from "fs";
+import { createServer } from "vite";
 
 import ReactDOM from "react-dom/server";
 // @ts-expect-error
@@ -12,6 +13,7 @@ const { createFromReadableStream } = rsdwc;
 
 import { allClientComponents } from "./app/client/clientComponents.js";
 import { use } from "react";
+import { LinesStream, MergedStream, RscScriptStream } from "./stream.js";
 
 function render() {
   const rscFile = fileURLToPath(
@@ -28,11 +30,10 @@ globalThis.__webpack_require__ = async () => {
   return allClientComponents;
 };
 
-async function renderHTML(): Promise<Readable> {
+async function renderHTML(): Promise<ReadableStream> {
   const [stream1, stream2] = Readable.toWeb(render()).tee();
 
   const chunk = createFromReadableStream(stream1);
-  // const rscData = await readAll(stream2);
 
   const PageContainer: React.FC = () => {
     return (
@@ -42,34 +43,51 @@ async function renderHTML(): Promise<Readable> {
         </head>
         <body>
           <div id="app">{use(chunk)}</div>
-          {/* <script id="rsc-data" data-data={rscData} /> */}
         </body>
       </html>
     );
   };
 
-  const htmlStream = ReactDOM.renderToPipeableStream(<PageContainer />, {
-    bootstrapModules: ["src/client.tsx"],
-  }).pipe(new PassThrough());
+  return new Promise((resolve) => {
+    const reactStream = ReactDOM.renderToPipeableStream(<PageContainer />, {
+      bootstrapScriptContent: `
+globalThis.rscData = [];
+`,
+      bootstrapModules: ["src/client.tsx"],
+      onShellReady() {
+        const rscStream = stream2
+          .pipeThrough(new LinesStream())
+          .pipeThrough(new RscScriptStream());
 
-  return htmlStream;
+        const htmlStream = new MergedStream(
+          [Readable.toWeb(reactStream.pipe(new PassThrough())), rscStream],
+          0,
+        );
+        resolve(htmlStream);
+      },
+    });
+  });
 }
 
+const vite = await createServer();
+
 const server = http.createServer((req, res) => {
-  renderHTML()
-    .then((html) => {
-      res.writeHead(200, {
-        "Content-Type": "text/html",
+  vite.middlewares(req, res, () => {
+    renderHTML()
+      .then((html) => {
+        res.writeHead(200, {
+          "Content-Type": "text/html",
+        });
+        Readable.fromWeb(html).pipe(res);
+      })
+      .catch((error) => {
+        console.error(error);
+        res.writeHead(500, {
+          "Content-Type": "text/plain",
+        });
+        res.end(String(error));
       });
-      html.pipe(res);
-    })
-    .catch((error) => {
-      console.error(error);
-      res.writeHead(500, {
-        "Content-Type": "text/plain",
-      });
-      res.end(String(error));
-    });
+  });
 });
 server.listen(8888, () => {
   console.log("Listening on http://localhost:8888");
