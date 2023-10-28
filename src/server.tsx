@@ -1,7 +1,7 @@
 import type {} from "react/canary";
 import { spawn } from "child_process";
+import http from "http";
 import { Readable, PassThrough } from "stream";
-import type { ReadableStream } from "stream/web";
 import { fileURLToPath } from "url";
 import { createWriteStream } from "fs";
 
@@ -55,16 +55,22 @@ async function renderHTML(): Promise<Readable> {
   return htmlStream;
 }
 
-async function readAll(stream: ReadableStream<Uint8Array>): Promise<string> {
-  let result = "";
-  const decoder = new TextDecoder();
-  for await (const chunk of stream) {
-    result += decoder.decode(chunk);
-  }
-  return result;
-}
-
-renderHTML().then(async (html) => {
-  const file = createWriteStream("./index.html");
-  html.pipe(file);
+const server = http.createServer((req, res) => {
+  renderHTML()
+    .then((html) => {
+      res.writeHead(200, {
+        "Content-Type": "text/html",
+      });
+      html.pipe(res);
+    })
+    .catch((error) => {
+      console.error(error);
+      res.writeHead(500, {
+        "Content-Type": "text/plain",
+      });
+      res.end(String(error));
+    });
+});
+server.listen(8888, () => {
+  console.log("Listening on http://localhost:8888");
 });
