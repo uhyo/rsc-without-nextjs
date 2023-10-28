@@ -8,7 +8,7 @@ export const Uhyo: React.FC = async () => {
       },
     })
   ).default;
-  await new Promise((resolve) => setTimeout(resolve, 1000));
+  await new Promise((resolve) => setTimeout(resolve, 5000));
   return (
     <section>
       <h2>Hello, I'm {uhyoData.name}</h2>

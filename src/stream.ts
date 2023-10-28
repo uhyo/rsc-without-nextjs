@@ -98,6 +98,9 @@ export class RscScriptStream extends TransformStream<string, string> {
           )});</script>\n`,
         );
       },
+      flush(controller) {
+        controller.enqueue(`<script>globalThis.rscData.end?.();</script>\n`);
+      },
     });
   }
 }
