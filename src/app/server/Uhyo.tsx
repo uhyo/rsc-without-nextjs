@@ -1,7 +1,11 @@
-export const Uhyo = async () => {
+import type {} from "react/experimental";
+
+export const Uhyo: React.FC = async () => {
   const uhyoData = (
     await import("../../data/uhyo.json", {
-      assert: { type: "json" },
+      assert: {
+        type: "json",
+      },
     })
   ).default;
   return (

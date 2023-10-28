@@ -32,7 +32,7 @@ async function renderHTML(): Promise<Readable> {
   const [stream1, stream2] = Readable.toWeb(render()).tee();
 
   const chunk = createFromReadableStream(stream1);
-  const rscData = await readAll(stream2);
+  // const rscData = await readAll(stream2);
 
   const PageContainer: React.FC = () => {
     return (
@@ -42,7 +42,7 @@ async function renderHTML(): Promise<Readable> {
         </head>
         <body>
           <div id="app">{use(chunk)}</div>
-          <script id="rsc-data" data-data={rscData} />
+          {/* <script id="rsc-data" data-data={rscData} /> */}
         </body>
       </html>
     );
