@@ -9,6 +9,7 @@ export const App: React.FC = () => {
       <p>Hello, world!</p>
       <Suspense fallback={<p>Loading...</p>}>
         <Uhyo />
+        <Client.Counter />
       </Suspense>
       <Client.Clock />
     </Page>
